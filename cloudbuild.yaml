@@ -16,3 +16,5 @@ steps:
       - 'us-central1-docker.pkg.dev/hobby-440408/skudo-repo/skudo-app:latest'
       - '--region'
       - 'us-central1'
+options:
+  logging: CLOUD_LOGGING_ONLY
