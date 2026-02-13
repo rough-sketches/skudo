@@ -127,7 +127,18 @@ resource "google_cloudbuild_trigger" "push_trigger" {
   build {
     step {
       name = "gcr.io/cloud-builders/docker"
-      args = ["build", "-t", "${var.region}-docker.pkg.dev/${var.project_id}/skudo-repo/skudo-app:latest", "."]
+      args = [
+        "build",
+        "--build-arg=NEXT_PUBLIC_FIREBASE_API_KEY=${var.firebase_api_key}",
+        "--build-arg=NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${var.firebase_auth_domain}",
+        "--build-arg=NEXT_PUBLIC_FIREBASE_PROJECT_ID=${var.firebase_project_id}",
+        "--build-arg=NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${var.firebase_storage_bucket}",
+        "--build-arg=NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${var.firebase_messaging_sender_id}",
+        "--build-arg=NEXT_PUBLIC_FIREBASE_APP_ID=${var.firebase_app_id}",
+        "--build-arg=NEXT_PUBLIC_YOUTUBE_API_KEY=${var.youtube_api_key}",
+        "-t", "${var.region}-docker.pkg.dev/${var.project_id}/skudo-repo/skudo-app:latest",
+        "."
+      ]
     }
     step {
       name = "gcr.io/cloud-builders/docker"
@@ -139,6 +150,10 @@ resource "google_cloudbuild_trigger" "push_trigger" {
       args = ["run", "deploy", "skudo-app", "--image", "${var.region}-docker.pkg.dev/${var.project_id}/skudo-repo/skudo-app:latest", "--region", var.region]
     }
     images = ["${var.region}-docker.pkg.dev/${var.project_id}/skudo-repo/skudo-app:latest"]
+
+    options {
+      logging = "CLOUD_LOGGING_ONLY"
+    }
   }
 
   depends_on = [google_project_service.cloudbuild]
