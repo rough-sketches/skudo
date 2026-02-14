@@ -13,6 +13,8 @@ This document outlines the planned enhancements and future features for the Skud
 
 ### 1. "My Courses" Dashboard
 - [x] **Implementation**: Create a dedicated view for logged-in users to see their collection of started courses.
+- [x] **Persistence**: Save user progress (which videos are completed) to Firestore.
+- [x] **Session Continuity**: Remember the last watched video and timestamp for each course.
 - [x] **Details**: Show progress bars, last-watched timestamps, and metadata (thumbnail, title) for each playlist saved in Firestore.
 
 ### 2. Video Notes & Timestamps

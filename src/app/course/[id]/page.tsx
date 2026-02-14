@@ -24,17 +24,12 @@ export default function CoursePage() {
     const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
     const [player, setPlayer] = useState<any>(null);
     const [currentTime, setCurrentTime] = useState(0);
+    const [initialTimestamp, setInitialTimestamp] = useState<number | null>(null);
+    const [hasRestoredProgress, setHasRestoredProgress] = useState(false);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Fetch Course Data
     const { data: course, error } = useSWR(playlistId ? `playlist-${playlistId}` : null, () => fetchPlaylistAsCourse(playlistId));
-
-    // Set first video as active by default
-    useEffect(() => {
-        if (course && course.videos.length > 0 && !activeVideoId) {
-            setActiveVideoId(course.videos[0].id);
-        }
-    }, [course, activeVideoId]);
 
     // Auth State
     useEffect(() => {
@@ -45,7 +40,7 @@ export default function CoursePage() {
         return () => unsubscribe();
     }, []);
 
-    // Fetch Progress from Firestore
+    // Fetch Progress from Firestore & Restore Active Video
     useEffect(() => {
         if (!user || !playlistId) return;
 
@@ -54,33 +49,89 @@ export default function CoursePage() {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 setCompletedVideos(new Set(data.completedVideoIds || []));
+
+                // Restore last video if not already set by interaction
+                if (!hasRestoredProgress) {
+                    if (data.lastVideoId) {
+                        setActiveVideoId(data.lastVideoId);
+                    }
+                    if (data.lastTimestamp) {
+                        setInitialTimestamp(data.lastTimestamp);
+                    }
+                    setHasRestoredProgress(true);
+                }
+            } else if (course && course.videos.length > 0 && !activeVideoId) {
+                // If no progress exists, default to first video
+                setActiveVideoId(course.videos[0].id);
+                setHasRestoredProgress(true);
             }
         });
 
         return () => unsubscribe();
-    }, [user, playlistId]);
+    }, [user, playlistId, course, hasRestoredProgress, activeVideoId]);
 
-    // Track Player Time
+    // Set first video as active if no progress exists after course load
+    useEffect(() => {
+        if (course && course.videos.length > 0 && !activeVideoId && hasRestoredProgress) {
+            setActiveVideoId(course.videos[0].id);
+        }
+    }, [course, activeVideoId, hasRestoredProgress]);
+
+    // Track Player Time & Periodically Save Progress
     useEffect(() => {
         if (player) {
             timerRef.current = setInterval(() => {
-                const time = player.getCurrentTime();
+                const time = Math.floor(player.getCurrentTime());
                 setCurrentTime(time);
+
+                // Save progress every 10 seconds if user is logged in
+                if (user && activeVideoId && time % 10 === 0 && time > 0) {
+                    const docRef = doc(db, "users", user.uid, "courses", playlistId);
+                    setDoc(docRef, {
+                        lastVideoId: activeVideoId,
+                        lastTimestamp: time,
+                        lastUpdated: Date.now(),
+                    }, { merge: true });
+                }
             }, 1000);
         }
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
         };
-    }, [player]);
+    }, [player, user, activeVideoId, playlistId]);
 
     const onPlayerReady: YouTubeProps['onReady'] = (event) => {
-        setPlayer(event.target);
+        const p = event.target;
+        setPlayer(p);
+
+        // Seek to initial timestamp if one was restored
+        if (initialTimestamp && initialTimestamp > 0) {
+            p.seekTo(initialTimestamp, true);
+            // We clear it after seeking so it doesn't keep seeking back if user refreshes or switches videos
+            setInitialTimestamp(null);
+        }
     };
 
     const handleSeek = (time: number) => {
         if (player) {
             player.seekTo(time, true);
             player.playVideo();
+        }
+    };
+
+    const handleVideoSelect = (videoId: string) => {
+        setActiveVideoId(videoId);
+        // Reset timestamp when manually switching videos
+        setInitialTimestamp(null);
+
+        // Save choice immediately
+        if (user) {
+            const docRef = doc(db, "users", user.uid, "courses", playlistId);
+            setDoc(docRef, {
+                lastVideoId: videoId,
+                lastTimestamp: 0,
+                lastUpdated: Date.now(),
+            }, { merge: true });
         }
     };
 
@@ -114,6 +165,9 @@ export default function CoursePage() {
                 title: course?.title || "",
                 totalVideos: course?.totalVideos || 0,
                 thumbnailUrl: course?.thumbnailUrl || "",
+                // Ensure we also keep the current state when completing video
+                lastVideoId: activeVideoId,
+                lastTimestamp: currentTime,
             }, { merge: true });
         }
     };
@@ -191,7 +245,7 @@ export default function CoursePage() {
                                 {course.videos.map((video: Video, index: number) => (
                                     <div
                                         key={video.id}
-                                        onClick={() => setActiveVideoId(video.id)}
+                                        onClick={() => handleVideoSelect(video.id)}
                                         className={`group flex items-start gap-4 p-4 rounded-xl transition-all cursor-pointer border ${activeVideoId === video.id
                                             ? "bg-blue-50/50 border-blue-200 shadow-sm ring-1 ring-blue-100"
                                             : "hover:bg-slate-50 border-transparent"
