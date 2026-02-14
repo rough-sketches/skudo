@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "lint:secrets": "secretlint \"**/*\"",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "emulators:start": "firebase emulators:start"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",
@@ -24,19 +28,27 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@secretlint/secretlint-rule-preset-recommend": "^11.3.1",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^5.1.4",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "husky": "^9.1.7",
+    "jsdom": "^27.0.1",
     "secretlint": "^11.3.1",
     "shadcn": "^3.8.4",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.4.0",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4",
+    "vitest-fetch-mock": "^0.4.5"
   }
 }

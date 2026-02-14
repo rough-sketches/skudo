@@ -2,6 +2,13 @@
 
 This document outlines the planned enhancements and future features for the Skudo YouTube Course Tracker.
 
+## 🏗️ Infrastructure & Quality
+
+### 0. Dev Environment & Testing
+- [x] **Unit Testing**: Setup Vitest and React Testing Library for core logic and components.
+- [x] **E2E Testing**: Setup Playwright for critical user flows (Login, Course Enrollment).
+- [x] **Local Firebase Emulators**: Configure emulators for Auth and Firestore to avoid using production data during dev.
+
 ## 🚀 Priority Roadmap
 
 ### 1. "My Courses" Dashboard
