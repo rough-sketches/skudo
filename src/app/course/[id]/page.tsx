@@ -18,20 +18,26 @@ import { VideoNotes } from "@/components/VideoNotes";
 export default function CoursePage() {
     const params = useParams();
     const playlistId = params.id as string;
+
+    // Auth State
     const [user, setUser] = useState<User | null>(null);
-    const [completedVideos, setCompletedVideos] = useState<Set<string>>(new Set());
     const [loadingAuth, setLoadingAuth] = useState(true);
+
+    // Progress State
+    const [completedVideos, setCompletedVideos] = useState<Set<string>>(new Set());
     const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
-    const [player, setPlayer] = useState<any>(null);
     const [currentTime, setCurrentTime] = useState(0);
     const [initialTimestamp, setInitialTimestamp] = useState<number | null>(null);
-    const [hasRestoredProgress, setHasRestoredProgress] = useState(false);
+
+    // Refs for stable logic
+    const playerRef = useRef<any>(null);
+    const hasRestoredRef = useRef(false);
     const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Fetch Course Data
     const { data: course, error } = useSWR(playlistId ? `playlist-${playlistId}` : null, () => fetchPlaylistAsCourse(playlistId));
 
-    // Auth State
+    // Listen for Auth changes
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
@@ -40,7 +46,7 @@ export default function CoursePage() {
         return () => unsubscribe();
     }, []);
 
-    // Fetch Progress from Firestore & Restore Active Video
+    // Sync Progress from Firestore
     useEffect(() => {
         if (!user || !playlistId) return;
 
@@ -50,81 +56,85 @@ export default function CoursePage() {
                 const data = docSnap.data();
                 setCompletedVideos(new Set(data.completedVideoIds || []));
 
-                // Restore last video if not already set by interaction
-                if (!hasRestoredProgress) {
+                // One-time restoration on session load
+                if (!hasRestoredRef.current) {
                     if (data.lastVideoId) {
                         setActiveVideoId(data.lastVideoId);
                     }
                     if (data.lastTimestamp) {
                         setInitialTimestamp(data.lastTimestamp);
                     }
-                    setHasRestoredProgress(true);
+                    hasRestoredRef.current = true;
                 }
-            } else if (course && course.videos.length > 0 && !activeVideoId) {
-                // If no progress exists, default to first video
-                setActiveVideoId(course.videos[0].id);
-                setHasRestoredProgress(true);
             }
         });
 
         return () => unsubscribe();
-    }, [user, playlistId, course, hasRestoredProgress, activeVideoId]);
+    }, [user, playlistId]);
 
-    // Set first video as active if no progress exists after course load
+    // Handle default video selection if no progress found
     useEffect(() => {
-        if (course && course.videos.length > 0 && !activeVideoId && hasRestoredProgress) {
+        if (course && course.videos.length > 0 && !activeVideoId && hasRestoredRef.current === false) {
+            // Check if we already waited but found no doc (logic handled above)
+            // But if course finishes loading and we still have no active video, default to first
             setActiveVideoId(course.videos[0].id);
+            hasRestoredRef.current = true;
         }
-    }, [course, activeVideoId, hasRestoredProgress]);
+    }, [course, activeVideoId]);
 
     // Track Player Time & Periodically Save Progress
     useEffect(() => {
-        if (player) {
+        if (playerRef.current) {
+            let lastSavedTime = 0;
             timerRef.current = setInterval(() => {
-                const time = Math.floor(player.getCurrentTime());
+                const p = playerRef.current;
+                if (!p || typeof p.getCurrentTime !== 'function') return;
+
+                const time = Math.floor(p.getCurrentTime());
                 setCurrentTime(time);
 
-                // Save progress every 10 seconds if user is logged in
-                if (user && activeVideoId && time % 10 === 0 && time > 0) {
+                // Save progress every 5 seconds if user is logged in
+                if (user && activeVideoId && Math.abs(time - lastSavedTime) >= 5 && time > 0) {
                     const docRef = doc(db, "users", user.uid, "courses", playlistId);
                     setDoc(docRef, {
                         lastVideoId: activeVideoId,
                         lastTimestamp: time,
                         lastUpdated: Date.now(),
                     }, { merge: true });
+                    lastSavedTime = time;
                 }
             }, 1000);
         }
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
         };
-    }, [player, user, activeVideoId, playlistId]);
+    }, [playerRef.current, user, activeVideoId, playlistId]);
+
+    // Handle initial seek when player and restored timestamp are both ready
+    useEffect(() => {
+        const p = playerRef.current;
+        if (p && typeof p.seekTo === 'function' && initialTimestamp !== null && initialTimestamp > 0) {
+            p.seekTo(initialTimestamp, true);
+            setInitialTimestamp(null); // Consumed
+        }
+    }, [playerRef.current, initialTimestamp]);
 
     const onPlayerReady: YouTubeProps['onReady'] = (event) => {
-        const p = event.target;
-        setPlayer(p);
-
-        // Seek to initial timestamp if one was restored
-        if (initialTimestamp && initialTimestamp > 0) {
-            p.seekTo(initialTimestamp, true);
-            // We clear it after seeking so it doesn't keep seeking back if user refreshes or switches videos
-            setInitialTimestamp(null);
-        }
+        playerRef.current = event.target;
     };
 
     const handleSeek = (time: number) => {
-        if (player) {
-            player.seekTo(time, true);
-            player.playVideo();
+        const p = playerRef.current;
+        if (p && typeof p.seekTo === 'function') {
+            p.seekTo(time, true);
+            p.playVideo();
         }
     };
 
     const handleVideoSelect = (videoId: string) => {
         setActiveVideoId(videoId);
-        // Reset timestamp when manually switching videos
         setInitialTimestamp(null);
 
-        // Save choice immediately
         if (user) {
             const docRef = doc(db, "users", user.uid, "courses", playlistId);
             setDoc(docRef, {
@@ -165,7 +175,6 @@ export default function CoursePage() {
                 title: course?.title || "",
                 totalVideos: course?.totalVideos || 0,
                 thumbnailUrl: course?.thumbnailUrl || "",
-                // Ensure we also keep the current state when completing video
                 lastVideoId: activeVideoId,
                 lastTimestamp: currentTime,
             }, { merge: true });
