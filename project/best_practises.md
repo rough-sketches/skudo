@@ -1,34 +1,39 @@
-# Skudo Development Best Practices 💡
+# Skudo Development Learnings & Patterns 💡
 
-This document tracks technical insights and best practices derived from common pitfalls encountered during development. Follow these to prevent regressions and maintain code quality.
+This document captures architectural insights and efficient workflows discovered during the development of Skudo. These patterns help maintain a high-quality codebase and speed up future feature implementation.
 
-## 1. Next.js & React (Client/Server)
+## 1. Architectural Patterns
+
+### Stable State Restoration
+- **Pattern**: Use `useRef` for one-time initialization flags or to store third-party player instances (like YouTube).
+- **Learning**: Using `useRef` for a `hasRestored` flag is more efficient than `useState` because it avoids an extra re-render cycle when synchronizing with external databases like Firestore. It also prevents infinite subscription loops in `useEffect`.
+
+### Component-Driven Development
+- **Pattern**: Decouple layout from logic using specialized components (e.g., `VideoNotes`, `CourseCard`).
+- **Learning**: Keeping the "heavy lifting" (Firestore queries, YouTube API calls) inside focused components keeps the main page logic clean and responsive. It also makes unit testing with Vitest significantly more straightforward.
+
+## 2. Efficiency Gains
+
+### Firebase Emulator Suite
+- **Insight**: Developing against the local Firebase Emulator (`:4000`) is vastly more efficient than deploying to live Firebase.
+- **Workflow**: Keep the emulator running in a background tab to verify data shapes (Firestore) and authentication states in real-time without external network latency.
+
+### Centralized Mocking
+- **Insight**: Investing time in a robust `src/test/setup.ts` pays off quickly. 
+- **Learning**: While mocked services need maintenance, they allow for instant feedback loops in UI development which is much faster than manual browser clicking for every state change.
+
+## 3. UI/UX Refinements
 
 ### Directive Discipline
-- **"use client"**: Always add this directive at the very top of files that use React hooks (`useState`, `useEffect`), browser APIs (`window`), or event handlers. 
-- **Hydration Safety**: Avoid using browser-only variables (like `window.localStorage`) directly in the initial render or `useState` initializers. Wrap them in `useEffect` to ensure the server and client initial HTML match.
+- **Insight**: Stick to a "Top-Down" `use client` approach. 
+- **Learning**: Explicitly marking client components early avoids confusing hydration errors, especially when integrating with libraries that rely on browser globals like the YouTube IFrame API.
 
-### Component Isolation
-- Keep complex logic like the YouTube Player or Video Notes in standalone components. This makes testing easier and prevents a crash in one feature from taking down the entire page.
+### Responsive-First Styling
+- **Pattern**: Leverage Tailwind's arbitrary values and modifiers for "sticky" mobile players.
+- **Learning**: Mobile layouts don't just need to be smaller subsets of desktop; they often benefit from different scrolling containers (e.g., `ScrollArea` for the playlist while the video remains fixed at the top).
 
-## 2. Firebase & Data Persistence
+## 4. Maintenance & Security
 
-### Atomic Saves
-- When updating course progress, use `{ merge: true }` in `setDoc` to prevent accidentally overwriting other fields (like notes or metadata).
-
-### Mocking for Tests
-- **Comprehensive Mocks**: When adding new Firebase functionality (e.g., Auth Emulators, Firestore `where` queries), ensure the corresponding mock in `src/test/setup.ts` is updated. Missing exports like `connectAuthEmulator` or `getApps` will cause test suites to fail.
-- **Cleanup Handlers**: Mock functions like `onSnapshot` must return a cleanup function (unsubscribe) to prevent "unsubscribe is not a function" errors during component unmounting in tests.
-
-## 3. State Restoration & Race Conditions
-
-### Player Initialization
-- **The "Ready" Check**: Never attempt to control the YouTube player (e.g., `seekTo`) before the `onReady` event has fired. 
-- **State Sync**: Use a dedicated `useEffect` that monitors both the `player` instance and the `restoredTimestamp`. Trigger the seek only when both are present and valid.
-
-## 4. CSS & UI
-- **Responsive-First**: Always use mobile-friendly classes (e.g., `aspect-video`, `container mx-auto p-4 lg:p-8`). Test UI changes at multiple zoom levels and screen sizes.
-- **Z-Index Awareness**: Be careful with `sticky` positioning on video players; ensure they don't overlap with navigation menus or modals.
-
-## 5. Security & Secrets
-- **SecretLint**: Always run `npm run secret-scan` before pushing code. Never commit `.env.local` or hardcoded API keys.
+### Automated Pre-checks
+- **Pattern**: Use Git Hooks (`Husky`) for more than just linting.
+- **Learning**: Running a secret scan (`SecretLint`) automatically on every commit is a low-overhead way to ensure API keys (from `.env.local`) never leak into the repository.
