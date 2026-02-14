@@ -26,11 +26,13 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center">Video Course Tracker</CardTitle>
-          <CardDescription className="text-center">
+    <div className="flex flex-col min-h-[calc(100vh-64px)] items-center justify-center bg-gray-50 p-6">
+      <Card className="w-full max-w-md shadow-lg border-slate-200">
+        <CardHeader className="space-y-1 pb-4 text-center">
+          <CardTitle className="text-3xl font-extrabold tracking-tight text-slate-900">
+            Video Course Tracker
+          </CardTitle>
+          <CardDescription className="text-slate-500 text-base">
             Turn any YouTube Playlist into a trackable course.
           </CardDescription>
         </CardHeader>

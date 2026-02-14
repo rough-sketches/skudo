@@ -18,8 +18,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <header className="p-4 border-b flex justify-between items-center bg-white shadow-sm">
-          <h1 className="text-xl font-bold tracking-tight">Skudo</h1>
+        <header className="px-4 lg:px-8 py-4 border-b flex justify-between items-center bg-white shadow-sm">
+          <a href="/" className="text-xl font-bold tracking-tight hover:opacity-80 transition-opacity">
+            Skudo
+          </a>
           <UserAuth />
         </header>
         <main>{children}</main>

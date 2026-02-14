@@ -100,10 +100,10 @@ export default function CoursePage() {
 
     return (
         <div className="container mx-auto max-w-7xl p-4 lg:p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
                 {/* Left Column: Video Player & Header */}
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="aspect-video w-full rounded-xl overflow-hidden bg-slate-100 shadow-xl border border-slate-200">
+                <div className="lg:col-span-2 space-y-4 lg:space-y-6">
+                    <div className="aspect-video w-full rounded-xl overflow-hidden bg-slate-100 shadow-xl border border-slate-200 sticky top-4 z-10 lg:relative lg:top-0">
                         {activeVideoId ? (
                             <iframe
                                 src={`https://www.youtube.com/embed/${activeVideoId}?autoplay=1&rel=0`}
@@ -118,56 +118,59 @@ export default function CoursePage() {
                         )}
                     </div>
 
-                    <Card border-none shadow-none bg-transparent>
+                    <Card className="border-none shadow-none bg-transparent">
                         <CardHeader className="px-0 pt-0">
-                            <CardTitle className="text-2xl font-bold">{course.title}</CardTitle>
-                            <div className="flex items-center gap-4 mt-2">
+                            <CardTitle className="text-xl lg:text-3xl font-bold tracking-tight text-slate-900">
+                                {course.title}
+                            </CardTitle>
+                            <div className="flex items-center gap-4 mt-3">
                                 <div className="flex-1 max-w-md h-2 bg-slate-100 rounded-full overflow-hidden">
                                     <div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${progress}%` }} />
                                 </div>
-                                <span className="text-sm font-semibold text-slate-600">{progress}% Complete</span>
+                                <span className="text-sm font-bold text-slate-700">{progress}%</span>
                             </div>
-                            <p className="text-slate-500 mt-4 leading-relaxed">{course.description}</p>
+                            <p className="text-slate-500 mt-4 leading-relaxed text-sm lg:text-base">
+                                {course.description}
+                            </p>
                         </CardHeader>
                     </Card>
                 </div>
 
                 {/* Right Column: Video Playlist */}
                 <div className="space-y-4">
-                    <h3 className="font-bold text-lg text-slate-800 px-1">Checklist</h3>
-                    <ScrollArea className="h-[calc(100vh-250px)] w-full rounded-xl border border-slate-200 bg-white shadow-sm p-2">
-                        <div className="space-y-2">
+                    <h3 className="font-bold text-lg text-slate-900 px-1 hidden lg:block">Course Content</h3>
+                    <ScrollArea className="h-auto lg:h-[calc(100vh-250px)] max-h-[500px] lg:max-h-none w-full rounded-xl border border-slate-200 bg-white shadow-md lg:shadow-sm p-2">
+                        <div className="space-y-1.5 lg:space-y-2">
                             {course.videos.map((video: Video, index: number) => (
                                 <div
                                     key={video.id}
                                     onClick={() => setActiveVideoId(video.id)}
-                                    className={`group flex items-center gap-3 p-3 rounded-lg transition-all cursor-pointer ${activeVideoId === video.id
+                                    className={`group flex items-start lg:items-center gap-3 p-3 rounded-lg transition-all cursor-pointer ${activeVideoId === video.id
                                         ? "bg-slate-50 border-slate-200 border shadow-sm ring-1 ring-slate-200"
                                         : "hover:bg-slate-50 border border-transparent"
                                         }`}
                                 >
-                                    <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                                    <div className="flex-shrink-0 mt-0.5 lg:mt-0" onClick={(e) => e.stopPropagation()}>
                                         <Checkbox
                                             id={video.id}
                                             checked={completedVideos.has(video.id)}
                                             onCheckedChange={(checked) => {
-                                                // Create a fake event for toggleVideoCompletion
                                                 toggleVideoCompletion({ stopPropagation: () => { } } as any, video.id);
                                             }}
                                             className="h-5 w-5 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
                                         />
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className={`text-sm font-medium leading-tight truncate ${completedVideos.has(video.id) ? "text-slate-400 line-through" : "text-slate-800"
+                                        <p className={`text-sm lg:text-base font-medium leading-tight ${completedVideos.has(video.id) ? "text-slate-400 line-through" : "text-slate-800"
                                             }`}>
                                             {index + 1}. {video.title}
                                         </p>
-                                        <p className="text-[10px] text-slate-400 mt-1 uppercase tracking-wider font-semibold">
+                                        <p className="text-[10px] lg:text-xs text-slate-400 mt-1 uppercase tracking-wider font-bold">
                                             {video.channelTitle}
                                         </p>
                                     </div>
                                     {activeVideoId === video.id && (
-                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                                        <div className="shrink-0 w-2 h-2 rounded-full bg-blue-500 animate-pulse mt-1.5 lg:mt-0" />
                                     )}
                                 </div>
                             ))}
