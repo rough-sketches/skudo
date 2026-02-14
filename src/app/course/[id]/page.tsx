@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import useSWR from "swr"; // We'll need to install swr or use useEffect
+import { useEffect, useState, useRef } from "react";
+import useSWR from "swr";
 import { useParams } from "next/navigation";
 import { fetchPlaylistAsCourse } from "@/lib/youtube";
 import { Course, Video } from "@/types";
@@ -9,9 +9,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import confetti from "canvas-confetti";
-import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, onSnapshot } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { onAuthStateChanged, User } from "firebase/auth";
+import YouTube, { YouTubeProps } from "react-youtube";
+import { VideoNotes } from "@/components/VideoNotes";
 
 export default function CoursePage() {
     const params = useParams();
@@ -20,6 +22,9 @@ export default function CoursePage() {
     const [completedVideos, setCompletedVideos] = useState<Set<string>>(new Set());
     const [loadingAuth, setLoadingAuth] = useState(true);
     const [activeVideoId, setActiveVideoId] = useState<string | null>(null);
+    const [player, setPlayer] = useState<any>(null);
+    const [currentTime, setCurrentTime] = useState(0);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Fetch Course Data
     const { data: course, error } = useSWR(playlistId ? `playlist-${playlistId}` : null, () => fetchPlaylistAsCourse(playlistId));
@@ -55,8 +60,31 @@ export default function CoursePage() {
         return () => unsubscribe();
     }, [user, playlistId]);
 
+    // Track Player Time
+    useEffect(() => {
+        if (player) {
+            timerRef.current = setInterval(() => {
+                const time = player.getCurrentTime();
+                setCurrentTime(time);
+            }, 1000);
+        }
+        return () => {
+            if (timerRef.current) clearInterval(timerRef.current);
+        };
+    }, [player]);
+
+    const onPlayerReady: YouTubeProps['onReady'] = (event) => {
+        setPlayer(event.target);
+    };
+
+    const handleSeek = (time: number) => {
+        if (player) {
+            player.seekTo(time, true);
+            player.playVideo();
+        }
+    };
+
     const toggleVideoCompletion = async (e: React.MouseEvent | React.ChangeEvent, videoId: string) => {
-        // Prevent event bubbling if clicking checkbox specifically
         e.stopPropagation();
 
         const newCompleted = new Set(completedVideos);
@@ -66,7 +94,6 @@ export default function CoursePage() {
             newCompleted.delete(videoId);
         } else {
             newCompleted.add(videoId);
-            // Trigger confetti if this was the last video!
             if (course && newCompleted.size === course.videos.length) {
                 confetti({
                     particleCount: 150,
@@ -78,14 +105,12 @@ export default function CoursePage() {
 
         setCompletedVideos(newCompleted);
 
-        // Persist to Firestore if logged in
         if (user) {
             const docRef = doc(db, "users", user.uid, "courses", playlistId);
             await setDoc(docRef, {
                 playlistId,
                 completedVideoIds: Array.from(newCompleted),
                 lastUpdated: Date.now(),
-                // Save minimal course info for a "My Courses" list later
                 title: course?.title || "",
                 totalVideos: course?.totalVideos || 0,
                 thumbnailUrl: course?.thumbnailUrl || "",
@@ -100,16 +125,24 @@ export default function CoursePage() {
 
     return (
         <div className="container mx-auto max-w-7xl p-4 lg:p-8">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-                {/* Left Column: Video Player & Header */}
-                <div className="lg:col-span-2 space-y-4 lg:space-y-6">
-                    <div className="aspect-video w-full rounded-xl overflow-hidden bg-slate-100 shadow-xl border border-slate-200 sticky top-4 z-10 lg:relative lg:top-0">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-10">
+                {/* Left Column: Video Player & Content */}
+                <div className="lg:col-span-2 space-y-6 lg:space-y-10">
+                    <div className="aspect-video w-full rounded-2xl overflow-hidden bg-slate-900 shadow-2xl border border-slate-200 sticky top-4 z-10 lg:relative lg:top-0">
                         {activeVideoId ? (
-                            <iframe
-                                src={`https://www.youtube.com/embed/${activeVideoId}?autoplay=1&rel=0`}
+                            <YouTube
+                                videoId={activeVideoId}
                                 className="w-full h-full"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
+                                opts={{
+                                    height: '100%',
+                                    width: '100%',
+                                    playerVars: {
+                                        autoplay: 1,
+                                        rel: 0,
+                                        modestbranding: 1,
+                                    },
+                                }}
+                                onReady={onPlayerReady}
                             />
                         ) : (
                             <div className="flex items-center justify-center h-full text-slate-400">
@@ -118,64 +151,81 @@ export default function CoursePage() {
                         )}
                     </div>
 
-                    <Card className="border-none shadow-none bg-transparent">
-                        <CardHeader className="px-0 pt-0">
-                            <CardTitle className="text-xl lg:text-3xl font-bold tracking-tight text-slate-900">
-                                {course.title}
-                            </CardTitle>
-                            <div className="flex items-center gap-4 mt-3">
-                                <div className="flex-1 max-w-md h-2 bg-slate-100 rounded-full overflow-hidden">
-                                    <div className="h-full bg-green-500 transition-all duration-500" style={{ width: `${progress}%` }} />
+                    <div className="space-y-8">
+                        <Card className="border-none shadow-none bg-transparent">
+                            <CardHeader className="px-0 pt-0">
+                                <CardTitle className="text-2xl lg:text-4xl font-extrabold tracking-tight text-slate-900 leading-tight">
+                                    {course.title}
+                                </CardTitle>
+                                <div className="flex items-center gap-4 mt-6">
+                                    <div className="flex-1 max-w-md h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                                        <div className="h-full bg-green-500 transition-all duration-700 ease-out" style={{ width: `${progress}%` }} />
+                                    </div>
+                                    <span className="text-sm font-bold text-slate-700 bg-slate-50 px-2 py-1 rounded-md border border-slate-100">{progress}% Complete</span>
                                 </div>
-                                <span className="text-sm font-bold text-slate-700">{progress}%</span>
-                            </div>
-                            <p className="text-slate-500 mt-4 leading-relaxed text-sm lg:text-base">
-                                {course.description}
-                            </p>
-                        </CardHeader>
-                    </Card>
+                                <p className="text-slate-500 mt-6 leading-relaxed text-sm lg:text-lg max-w-3xl">
+                                    {course.description}
+                                </p>
+                            </CardHeader>
+                        </Card>
+
+                        {/* Video Notes Integration */}
+                        {user && activeVideoId && (
+                            <VideoNotes
+                                videoId={activeVideoId}
+                                playlistId={playlistId}
+                                userId={user.uid}
+                                currentTime={currentTime}
+                                onSeek={handleSeek}
+                            />
+                        )}
+                    </div>
                 </div>
 
                 {/* Right Column: Video Playlist */}
-                <div className="space-y-4">
-                    <h3 className="font-bold text-lg text-slate-900 px-1 hidden lg:block">Course Content</h3>
-                    <ScrollArea className="h-auto lg:h-[calc(100vh-250px)] max-h-[500px] lg:max-h-none w-full rounded-xl border border-slate-200 bg-white shadow-md lg:shadow-sm p-2">
-                        <div className="space-y-1.5 lg:space-y-2">
-                            {course.videos.map((video: Video, index: number) => (
-                                <div
-                                    key={video.id}
-                                    onClick={() => setActiveVideoId(video.id)}
-                                    className={`group flex items-start lg:items-center gap-3 p-3 rounded-lg transition-all cursor-pointer ${activeVideoId === video.id
-                                        ? "bg-slate-50 border-slate-200 border shadow-sm ring-1 ring-slate-200"
-                                        : "hover:bg-slate-50 border border-transparent"
-                                        }`}
-                                >
-                                    <div className="flex-shrink-0 mt-0.5 lg:mt-0" onClick={(e) => e.stopPropagation()}>
-                                        <Checkbox
-                                            id={video.id}
-                                            checked={completedVideos.has(video.id)}
-                                            onCheckedChange={(checked) => {
-                                                toggleVideoCompletion({ stopPropagation: () => { } } as any, video.id);
-                                            }}
-                                            className="h-5 w-5 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500"
-                                        />
+                <div className="space-y-6 lg:mt-0">
+                    <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                        <h3 className="font-bold text-lg text-slate-900 pb-3 border-b border-slate-50">Course Content</h3>
+                        <ScrollArea className="h-auto lg:h-[calc(100vh-280px)] max-h-[500px] lg:max-h-none w-full mt-4">
+                            <div className="space-y-1.5 pr-3">
+                                {course.videos.map((video: Video, index: number) => (
+                                    <div
+                                        key={video.id}
+                                        onClick={() => setActiveVideoId(video.id)}
+                                        className={`group flex items-start gap-4 p-4 rounded-xl transition-all cursor-pointer border ${activeVideoId === video.id
+                                            ? "bg-blue-50/50 border-blue-200 shadow-sm ring-1 ring-blue-100"
+                                            : "hover:bg-slate-50 border-transparent"
+                                            }`}
+                                    >
+                                        <div className="flex-shrink-0 mt-1" onClick={(e) => e.stopPropagation()}>
+                                            <Checkbox
+                                                id={video.id}
+                                                checked={completedVideos.has(video.id)}
+                                                onCheckedChange={(checked) => {
+                                                    toggleVideoCompletion({ stopPropagation: () => { } } as any, video.id);
+                                                }}
+                                                className="h-5 w-5 rounded-md border-slate-300 data-[state=checked]:bg-green-500 data-[state=checked]:border-green-500 transition-colors"
+                                            />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className={`text-sm lg:text-base font-semibold leading-snug transition-colors ${completedVideos.has(video.id) ? "text-slate-400 line-through" : "text-slate-800"
+                                                }`}>
+                                                {index + 1}. {video.title}
+                                            </p>
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
+                                                    {video.channelTitle}
+                                                </span>
+                                                {activeVideoId === video.id && (
+                                                    <span className="flex h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className={`text-sm lg:text-base font-medium leading-tight ${completedVideos.has(video.id) ? "text-slate-400 line-through" : "text-slate-800"
-                                            }`}>
-                                            {index + 1}. {video.title}
-                                        </p>
-                                        <p className="text-[10px] lg:text-xs text-slate-400 mt-1 uppercase tracking-wider font-bold">
-                                            {video.channelTitle}
-                                        </p>
-                                    </div>
-                                    {activeVideoId === video.id && (
-                                        <div className="shrink-0 w-2 h-2 rounded-full bg-blue-500 animate-pulse mt-1.5 lg:mt-0" />
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-                    </ScrollArea>
+                                ))}
+                            </div>
+                        </ScrollArea>
+                    </div>
                 </div>
             </div>
         </div>

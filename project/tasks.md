@@ -12,12 +12,12 @@ This document outlines the planned enhancements and future features for the Skud
 ## 🚀 Priority Roadmap
 
 ### 1. "My Courses" Dashboard
-- [ ] **Implementation**: Create a dedicated view for logged-in users to see their collection of started courses.
-- [ ] **Details**: Show progress bars, last-watched timestamps, and metadata (thumbnail, title) for each playlist saved in Firestore.
+- [x] **Implementation**: Create a dedicated view for logged-in users to see their collection of started courses.
+- [x] **Details**: Show progress bars, last-watched timestamps, and metadata (thumbnail, title) for each playlist saved in Firestore.
 
 ### 2. Video Notes & Timestamps
-- [ ] **Implementation**: Add a "Notes" section below or beside the video player.
-- [ ] **Details**: Allow users to save text notes tied to specific timestamps in the video. Clicking a note should seek the player to that time.
+- [x] **Implementation**: Add a "Notes" section below or beside the video player.
+- [x] **Details**: Allow users to save text notes tied to specific timestamps in the video. Clicking a note should seek the player to that time.
 
 ### 3. Dark Mode Support
 - [ ] **Implementation**: Leverage Tailwind's `dark` mode and Shadcn/UI themes.

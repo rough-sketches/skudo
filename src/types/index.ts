@@ -22,3 +22,13 @@ export interface UserCourseProgress {
     completedVideoIds: string[];
     lastUpdated: number; // timestamp
 }
+
+export interface VideoNote {
+    id: string;
+    videoId: string;
+    playlistId: string;
+    userId: string;
+    timestamp: number;
+    text: string;
+    createdAt: number;
+}
